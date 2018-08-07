@@ -1,17 +1,7 @@
-import BelgiUtil.ATTR_EQUALS
 import BelgiUtil.ATTR_LABEL_ID
-import BelgiUtil.ATTR_LABEL_CONSTRAINT_TO_ID
-import BelgiUtil.ATTR_SEPERATOR
-import BelgiUtil.ATTR_VALUE_EMPTY_CONSTRAINT
-import BelgiUtil.SERIALIZING_SEPARATOR
-import BelgiUtil.TAG_CONSTRAINT_END
-import BelgiUtil.TAG_CONSTRAINT_START
-import BelgiUtil.TAG_BELGI_END
-import BelgiUtil.TAG_BELGI_START
 import BelgiUtil.TAG_MARKUP_END
 import BelgiUtil.TAG_MARKUP_START
 import BelgiUtil.TAG_NAME_BELGI
-import BelgiUtil.TAG_NAME_CONSTRAINT
 import BelgiUtil.createId
 import org.w3c.dom.Document
 import org.xml.sax.InputSource
@@ -25,26 +15,32 @@ object BelgiUtil {
     const val TAG_MARKUP_START = "<$TAG_NAME_MARKUP>"
     const val TAG_MARKUP_END = "</$TAG_NAME_MARKUP>"
     const val TAG_NAME_BELGI = "Belgi"
-    const val TAG_BELGI_START = "<$TAG_NAME_BELGI"
-    const val TAG_BELGI_END = "/>"
     const val TAG_NAME_CONSTRAINT = "Constraint"
-    const val TAG_CONSTRAINT_START = "<$TAG_NAME_CONSTRAINT"
-    const val TAG_CONSTRAINT_END = "/>"
+    private const val TAG_NAME_LINE = "Line"
 
-    const val ATTR_SEPERATOR = " "
-    const val ATTR_EQUALS = "="
     const val ATTR_LABEL_ID = "id"
     const val ATTR_LABEL_CONSTRAINT_TO_ID = "to_id"
-    const val ATTR_VALUE_EMPTY_CONSTRAINT = "-1"
-
-    const val SERIALIZING_SEPARATOR = ":"
+    const val ATTR_LABEL_CONSTRAINT_TO_EDGE = "to_edge"
+    const val ATTR_LABEL_MARGIN = "margin"
+    const val ATTR_VALUE_EMPTY_CONSTRAINT = -1
 
     val createId: Int get() = Random().nextInt().absoluteValue + 1
 
     fun buildXmlDocument(markup: String): Document {
-        val inputSource = InputSource(StringReader(markup.wellFormedXml))
-        val xml = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(inputSource)
-        return xml
+        val linedMarkup = wrapEachLine(markup)
+        val inputSource = InputSource(StringReader(linedMarkup.wellFormedXml))
+        val documentBuilderFactory = DocumentBuilderFactory.newInstance()
+        documentBuilderFactory.isIgnoringElementContentWhitespace = true
+        return documentBuilderFactory.newDocumentBuilder().parse(inputSource)
+    }
+
+    fun wrapEachLine(markup: String): String {
+        val stringBuilder = StringBuilder()
+        markup.split('\n').forEach {
+            stringBuilder.append("<$TAG_NAME_LINE>$it</$TAG_NAME_LINE>\n")
+        }
+        println(stringBuilder)
+        return stringBuilder.toString()
     }
 }
 
@@ -60,51 +56,34 @@ open class Belgi(val id: Int) {
 
     constructor() : this(createId)
 
+    private val idXmlAttr: String get() = "$ATTR_LABEL_ID=\"$id\""
+
     override fun toString() = """
-        $<$TAG_NAME_BELGI $ATTR_LABEL_ID="$id" />
+        $<$TAG_NAME_BELGI $idXmlAttr />
     """.trimIndent()
 }
 
 enum class Edge(val serializedValue: Int) {
     START(0),
     TOP(1),
-    RIGHT(2),
+    END(2),
     BOTTOM(3);
+}
 
-    val v: Int get() = serializedValue
+fun asEdge(value: Int): Edge {
+    if (value < 0 || value > 3) RuntimeException("Invalid edge value: $value")
+    return Edge.values().find { it.serializedValue == value }!! // TODO fix
 }
 
 open class SubjectiveConstraint(val fromEdge: Edge,
                                 val to: Pair<Belgi, Edge>,
-                                val margin: Int = 0)
+                                val margin: Int = 0) {
 
-open class Constraint(val from: Pair<Int, Int>,
-                      val to: Pair<Int, Int>,
-                      val margin: Int = 0) {
+    constructor(fromEdge: Edge, toBelgi: Belgi, toEdge: Edge, margin: Int = 0) : this(fromEdge, toBelgi to toEdge, margin)
 
-    private val Pair<Int, Int>.id: Int get() = first
-    private val Pair<Int, Int>.edge: Int get() = second
-
-    private val Int.orEmpty: String get() = if (this > 0) this.toString() else ""
-
-    override fun toString() =
-            TAG_CONSTRAINT_START +
-            from.id +
-            SERIALIZING_SEPARATOR +
-            from.edge +
-            SERIALIZING_SEPARATOR +
-            to.id +
-            SERIALIZING_SEPARATOR +
-            to.edge +
-            SERIALIZING_SEPARATOR +
-            margin.orEmpty +
-            TAG_CONSTRAINT_END
-}
-
-val empty: Any get() = object : Any() {
-    override fun toString() = """
-        <$TAG_NAME_CONSTRAINT $ATTR_LABEL_CONSTRAINT_TO_ID=$ATTR_VALUE_EMPTY_CONSTRAINT />
-    """.trimIndent() // <Constraint to_id="-1" />
+    override fun toString(): String {
+        return super.toString()
+    }
 }
 
 operator fun List<Any>.get(edge: Edge) = this[edge.serializedValue]
