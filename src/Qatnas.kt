@@ -2,35 +2,33 @@ import BelgiUtil.ATTR_LABEL_CONSTRAINT_TO_EDGE
 import BelgiUtil.ATTR_LABEL_CONSTRAINT_TO_ID
 import BelgiUtil.ATTR_LABEL_MARGIN
 import BelgiUtil.ATTR_VALUE_EMPTY_CONSTRAINT
-import BelgiUtil.TAG_NAME_CONSTRAINT
+import BelgiUtil.JSON_KEY_OF_TYPE
+import BelgiUtil.JSON_TYPE_QATNAS
+import Qatnas.Companion.qatnasMarker
 
-open class Qatnas(val toId: Int, val toEdge: Edge) {
+open class Qatnas(val toId: Int, val toPole: Boolean) {
 
-    constructor(toId: Int, toEdge: Edge, margin: Int) : this(toId, toEdge) {
+    constructor(toId: Int, toPole: Boolean, margin: Int) : this(toId, toPole) {
         this.margin = margin
     }
 
     var margin: Int = 0
 
-    infix fun by(margin: Int) = this.apply { this.margin = margin }
-
-    private val toIdXmlAttr: String get() = "$ATTR_LABEL_CONSTRAINT_TO_ID=\"$toId\""
-    private val toEdgeXmlAttr: String get() = "$ATTR_LABEL_CONSTRAINT_TO_EDGE=\"${toEdge.serializedValue}\""
-    private val marginXmlAttr: String get() ="$ATTR_LABEL_MARGIN=\"$margin\""
+    private val attrToId: String get() = "$ATTR_LABEL_CONSTRAINT_TO_ID : \"$toId\""
+    private val attrToPole: String get() = "$ATTR_LABEL_CONSTRAINT_TO_EDGE : \"$toPole\""
+    private val attrMargin: String get() ="$ATTR_LABEL_MARGIN : \"$margin\""
 
     override fun toString() = """
-        <$TAG_NAME_CONSTRAINT $toIdXmlAttr $toEdgeXmlAttr $marginXmlAttr></$TAG_NAME_CONSTRAINT>
+        { $qatnasMarker, $attrToId, $attrToPole, $attrMargin },
     """.trimIndent()
-}
 
-// TODO throw exception if invalid constraint (e.g: start to top)
-val Int.start: Qatnas get() = Qatnas(this, Edge.START)
-val Int.top: Qatnas get() = Qatnas(this, Edge.TOP)
-val Int.end: Qatnas get() = Qatnas(this, Edge.END)
-val Int.bottom: Qatnas get() = Qatnas(this, Edge.BOTTOM)
+    companion object {
+        const val qatnasMarker = "$JSON_KEY_OF_TYPE : $JSON_TYPE_QATNAS"
+    }
+}
 
 val empty: Any get() = object : Any() {
     override fun toString() = """
-        <$TAG_NAME_CONSTRAINT $ATTR_LABEL_CONSTRAINT_TO_ID="$ATTR_VALUE_EMPTY_CONSTRAINT" />
-    """.trimIndent() // <Constraint to_id="-1" />
+        { $qatnasMarker, $ATTR_LABEL_CONSTRAINT_TO_ID : $ATTR_VALUE_EMPTY_CONSTRAINT },
+    """.trimIndent()
 }
