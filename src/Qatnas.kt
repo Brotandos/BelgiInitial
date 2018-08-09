@@ -1,34 +1,47 @@
-import BelgiUtil.ATTR_LABEL_CONSTRAINT_TO_EDGE
-import BelgiUtil.ATTR_LABEL_CONSTRAINT_TO_ID
-import BelgiUtil.ATTR_LABEL_MARGIN
-import BelgiUtil.ATTR_VALUE_EMPTY_CONSTRAINT
-import BelgiUtil.JSON_KEY_OF_TYPE
-import BelgiUtil.JSON_TYPE_QATNAS
+import BelgiUtil.KEY_CONSTRAINT_TARGET_POLE
+import BelgiUtil.KEY_CONSTRAINT_TARGET_ID
+import BelgiUtil.KEY_MARGIN
+import BelgiUtil.VALUE_EMPTY_CONSTRAINT
+import BelgiUtil.KEY_OF_TYPE
+import BelgiUtil.VALUE_TYPE_QATNAS
 import Qatnas.Companion.qatnasMarker
 
-open class Qatnas(val toId: Int, val toPole: Boolean) {
+open class Qatnas(val targetId: Int, val targetPole: Boolean) {
 
-    constructor(toId: Int, toPole: Boolean, margin: Int) : this(toId, toPole) {
+    constructor(targetId: Int, targetPole: Boolean, margin: Int) : this(targetId, targetPole) {
         this.margin = margin
     }
 
     var margin: Int = 0
 
-    private val attrToId: String get() = "$ATTR_LABEL_CONSTRAINT_TO_ID : \"$toId\""
-    private val attrToPole: String get() = "$ATTR_LABEL_CONSTRAINT_TO_EDGE : \"$toPole\""
-    private val attrMargin: String get() ="$ATTR_LABEL_MARGIN : \"$margin\""
+    private val attrTargetId: String get() = "$KEY_CONSTRAINT_TARGET_ID : \"$targetId\""
+    private val attrTargetPole: String get() = "$KEY_CONSTRAINT_TARGET_POLE : \"$targetPole\""
+    private val attrMargin: String get() ="$KEY_MARGIN : \"$margin\""
 
     override fun toString() = """
-        { $qatnasMarker, $attrToId, $attrToPole, $attrMargin },
+        { $qatnasMarker, $attrTargetId, $attrTargetPole, $attrMargin },
     """.trimIndent()
 
     companion object {
-        const val qatnasMarker = "$JSON_KEY_OF_TYPE : $JSON_TYPE_QATNAS"
+        const val qatnasMarker = "$KEY_OF_TYPE : \"$VALUE_TYPE_QATNAS\""
     }
+}
+
+data class QatnasById(val fromEdge: Int,
+                      val toBelgiId: Int,
+                      val toEdge: Int,
+                      val margin: Int)
+
+open class SubjectiveQatnas(val fromEdge: Int,
+                            val to: Pair<Belgi, Int>,
+                            val margin: Int = 0) {
+    constructor(fromEdge: Int, toBelgi: Belgi, toEdge: Int, margin: Int = 0) : this(fromEdge, toBelgi to toEdge, margin)
+
+
 }
 
 val empty: Any get() = object : Any() {
     override fun toString() = """
-        { $qatnasMarker, $ATTR_LABEL_CONSTRAINT_TO_ID : $ATTR_VALUE_EMPTY_CONSTRAINT },
+        { $qatnasMarker, $KEY_CONSTRAINT_TARGET_ID : $VALUE_EMPTY_CONSTRAINT },
     """.trimIndent()
 }

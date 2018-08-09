@@ -1,52 +1,39 @@
-import BelgiUtil.ATTR_LABEL_ID
-import org.w3c.dom.Element
-import org.w3c.dom.Node
+import BelgiUtil.getBelgiToConstraintsList
 
 fun main(args: Array<String>) {
 
     val belgi1 = Belgi(1)
     val belgi2 = Belgi(2)
 
+    val b1 = belgi1
+    val b2 = belgi2
     val markup = """
-                          *
-        ${belgi2 - 10}$belgi1${belgi2 + 10}               ${belgi1 + 10}
-                  ${belgi2 + 10}              ${belgi1 + 10}$belgi2 *
-                                                                *
+                      *
+        ${b2 - 10}$belgi1${b2 + 10}               ${b1 + 10}
+                  ${b2 + 10}              ${b1 + 10}$belgi2 *
+                                                        *
     """.trimIndent()
 
-    val belgiList = markup.toBelgiList()
-    belgiList.forEach { println(it.id) }
+    val belgiList = toBelgiList(markup)
+    belgiList.forEach { println(it) }
 }
 
-fun String.toBelgiList(): List<Belgi> {
+fun toBelgiList(markup: String): List<Belgi> {
+    val listOfNormalizedJsonArray = BelgiUtil.wrapToBelgiNorm(markup)
+    val belgiToConstraintsList = getBelgiToConstraintsList(listOfNormalizedJsonArray)
     val belgiList = mutableListOf<Belgi>()
-    val normalizedJson = BelgiUtil.wrapToBelgiNorm(this)
-    val belgiNodeList = xmlDocument.getElementsByTagName(TAG_NAME_BELGI)
-    // TODO handle if elements don't exist
+    belgiToConstraintsList.forEach { belgiToConstraints ->
+        val belgi = belgiToConstraints.first
 
-    // collect all belgi from markup
-    for (i in 0 until belgiNodeList.length) {
-        val belgiNode = belgiNodeList.item(i)
-        if (belgiNode.nodeType == Node.ELEMENT_NODE)
-            belgiList += belgiNode.toBelgi()
-        else
-            RuntimeException("Unknown node type") // TODO make custom exception
+        belgiToConstraints.second.forEach { constraint ->
+            val toBelgi = belgiToConstraintsList.find { it.first.id == constraint.toBelgiId }?.first
+            if (toBelgi != null)
+                belgi.qatnasList += SubjectiveQatnas(constraint.fromEdge, toBelgi, constraint.toEdge, constraint.margin)
+            else
+                throw RuntimeException("There is no belgi inside markup with id ${constraint.toBelgiId}")
+        }
+
+        belgiList += belgi
     }
-
-    for (i in 0 until belgiNodeList.length)
-        addHorizontalConstraints(i, belgiList, belgiNodeList.item(i))
-
-    belgiList.forEach {
-        println("""
-            id: ${it.id}, constraints: ${it.constraints}
-        """.trimIndent())
-    }
-
     return belgiList
-}
-
-fun Node.toBelgi(): Belgi {
-    val belgiElement = this as Element
-    val id = belgiElement.getAttribute(ATTR_LABEL_ID).toInt()
-    return Belgi(id)
 }
