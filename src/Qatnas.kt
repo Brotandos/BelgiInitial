@@ -6,7 +6,7 @@ import BelgiUtil.KEY_OF_TYPE
 import BelgiUtil.VALUE_TYPE_QATNAS
 import Qatnas.Companion.qatnasMarker
 
-open class Qatnas(val targetId: Int, val targetPole: Boolean) {
+open class Qatnas(private val targetId: Int, private val targetPole: Boolean) {
 
     constructor(targetId: Int, targetPole: Boolean, margin: Int) : this(targetId, targetPole) {
         this.margin = margin
