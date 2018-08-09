@@ -1,7 +1,7 @@
-import BelgiUtil.KEY_CONSTRAINT_TARGET_POLE
-import BelgiUtil.KEY_CONSTRAINT_TARGET_ID
+import BelgiUtil.KEY_QATNAS_TARGET_POLE
+import BelgiUtil.KEY_QATNAS_TARGET_ID
 import BelgiUtil.KEY_MARGIN
-import BelgiUtil.VALUE_EMPTY_CONSTRAINT
+import BelgiUtil.VALUE_EMPTY_QATNAS
 import BelgiUtil.KEY_OF_TYPE
 import BelgiUtil.VALUE_TYPE_QATNAS
 import Qatnas.Companion.qatnasMarker
@@ -14,8 +14,8 @@ open class Qatnas(val targetId: Int, val targetPole: Boolean) {
 
     var margin: Int = 0
 
-    private val attrTargetId: String get() = "$KEY_CONSTRAINT_TARGET_ID : \"$targetId\""
-    private val attrTargetPole: String get() = "$KEY_CONSTRAINT_TARGET_POLE : \"$targetPole\""
+    private val attrTargetId: String get() = "$KEY_QATNAS_TARGET_ID : \"$targetId\""
+    private val attrTargetPole: String get() = "$KEY_QATNAS_TARGET_POLE : \"$targetPole\""
     private val attrMargin: String get() ="$KEY_MARGIN : \"$margin\""
 
     override fun toString() = """
@@ -42,6 +42,6 @@ open class SubjectiveQatnas(val fromEdge: Int,
 
 val empty: Any get() = object : Any() {
     override fun toString() = """
-        { $qatnasMarker, $KEY_CONSTRAINT_TARGET_ID : $VALUE_EMPTY_CONSTRAINT },
+        { $qatnasMarker, $KEY_QATNAS_TARGET_ID : $VALUE_EMPTY_QATNAS },
     """.trimIndent()
 }

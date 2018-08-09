@@ -11,7 +11,7 @@ import kotlin.math.absoluteValue
 
 object BelgiUtil {
     const val KEY_OF_TYPE = "type"
-    const val VALUE_TYPE_HANDLED = -1
+    private const val VALUE_TYPE_HANDLED_CONSTRAINT = -1
     const val VALUE_TYPE_BELGI = 0
     const val VALUE_TYPE_QATNAS = 1
 
@@ -19,11 +19,11 @@ object BelgiUtil {
     const val POLE_PLUS = true
 
     const val KEY_BELGI_ID = "id"
-    const val KEY_CONSTRAINT_TARGET_ID = "targetId"
-    const val KEY_CONSTRAINT_TARGET_POLE = "targetPole"
+    const val KEY_QATNAS_TARGET_ID = "targetId"
+    const val KEY_QATNAS_TARGET_POLE = "targetPole"
     const val KEY_MARGIN = "margin"
 
-    const val VALUE_EMPTY_CONSTRAINT = -1
+    const val VALUE_EMPTY_QATNAS = -1
     const val VALUE_START_EDGE = 0
     const val VALUE_TOP_EDGE = 1
     const val VALUE_END_EDGE = 2
@@ -31,7 +31,33 @@ object BelgiUtil {
 
     val createId: Int get() = Random().nextInt().absoluteValue + 1
 
-    fun wrapToBelgiNorm(markup: String): List<JSONArray> =
+    fun toBelgiList(markup: String): List<Belgi> {
+        val listOfNormalizedJsonArray = wrapToBelgiNorm(markup)
+        val belgiToQatnasesList = getBelgiToQatnasesList(listOfNormalizedJsonArray)
+        val belgiList = mutableListOf<Belgi>()
+        belgiToQatnasesList.forEach { belgiToQatnases ->
+            val belgi = belgiToQatnases.first
+
+            belgiToQatnases.second.forEach { qatnasById ->
+                val toBelgi = belgiToQatnasesList.find { it.first.id == qatnasById.toBelgiId }?.first
+                if (toBelgi != null)
+                    belgi.qatnasList += SubjectiveQatnas(qatnasById.fromEdge, toBelgi, qatnasById.toEdge, qatnasById.margin)
+                else
+                    throw RuntimeException("There is no belgi inside markup with id ${qatnasById.toBelgiId}")
+            }
+
+            belgiList += belgi
+        }
+        return belgiList
+    }
+
+    /**
+     * Wraps each of line into json's array representation, replaces all '*' characters into empty constraint
+     *
+     * @param   markup  passed constraint layout's markup
+     * @return          normalized for belgi parsing markup
+     * */
+    private fun wrapToBelgiNorm(markup: String): List<JSONArray> =
             markup
                     .replace("*", empty.toString())
                     .split("\n")
@@ -43,100 +69,125 @@ object BelgiUtil {
      * @see                 Belgi
      * @see                 QatnasById
      * */
-    fun getBelgiToConstraintsList(jsonArrays: List<JSONArray>): List<Pair<Belgi, List<QatnasById>>> {
-        val belgiToConstraintsPairList = mutableListOf<Pair<Belgi, List<QatnasById>>>()
+    private fun getBelgiToQatnasesList(jsonArrays: List<JSONArray>): List<Pair<Belgi, List<QatnasById>>> {
+        val belgiToQatnasesList = mutableListOf<Pair<Belgi, List<QatnasById>>>()
 
         jsonArrays.forEachIndexed { arrayIndex, jsonArray ->
             for (i in 0 until jsonArray.length()) {
                 val jsonObject = jsonArray.getJSONObject(i)
                 if (jsonObject.isBelgi) {
-                    val constraints = getHorizontalConstraints(jsonArray, i)
+                    val qatnases = getHorizontalQatnases(jsonArray, i)
+                    qatnases += getVerticalQatnases(jsonObject, jsonArrays, arrayIndex)
 
-                    if (arrayIndex == 0) RuntimeException("There must be constraint on top of belgi")
-                    val topJsonArray = jsonArrays[arrayIndex - 1]
-                    if (arrayIndex == jsonArrays.size - 1) RuntimeException("There must be constraint on bottom of belgi")
-                    val bottomJsonArray = jsonArrays[arrayIndex + 1]
-                    constraints += getVerticalConstraints(topJsonArray, bottomJsonArray, belgiToConstraintsPairList.size)
-
-                    belgiToConstraintsPairList += Belgi(jsonObject.getInt(KEY_BELGI_ID)) to constraints
+                    belgiToQatnasesList += Belgi(jsonObject.getInt(KEY_BELGI_ID)) to qatnases
                 }
             }
         }
 
-        return belgiToConstraintsPairList
+        return belgiToQatnasesList
     }
 
     /**
      * @param   jsonArray   array of json of markup's exact line
      * @param   index       index of current belgi
-     * @return              list of horizontal constraints' json representation
+     * @return              list of horizontal constraints
      * */
-    private fun getHorizontalConstraints(jsonArray: JSONArray, index: Int): MutableList<QatnasById> {
-        val horizontalConstraints = mutableListOf<QatnasById>()
-        if (index == 0 || index == jsonArray.length() - 1) throw RuntimeException("There must be constraints on both side of belgi!")
+    private fun getHorizontalQatnases(jsonArray: JSONArray, index: Int): MutableList<QatnasById> {
+        val horizontalQatnases = mutableListOf<QatnasById>()
+        if (index == 0 || index == jsonArray.length()) throw RuntimeException("There must be constraints on both side of belgi!")
 
-        val leftIndex = index - 1
-        getConstraint(jsonArray.getJSONObject(leftIndex), "left", VALUE_START_EDGE)
-                .let { if (it != null) horizontalConstraints += it }
+        jsonArray.getJSONObject(index - 1).let { leftJsonQatnas ->
+            getQatnas(leftJsonQatnas, "left", VALUE_START_EDGE)
+                    .let { if (it != null) horizontalQatnases += it }
+        }
 
-        val rightIndex = index + 1
-        getConstraint(jsonArray.getJSONObject(rightIndex), "right", VALUE_END_EDGE)
-                .let { if (it != null) horizontalConstraints += it}
+        jsonArray.getJSONObject(index + 1).let { rightJsonQatnas ->
+            getQatnas(rightJsonQatnas, "right", VALUE_END_EDGE)
+                    .let { if (it != null) horizontalQatnases += it}
+        }
 
-        jsonArray.getJSONObject(leftIndex).put(KEY_OF_TYPE, VALUE_TYPE_HANDLED)
-        jsonArray.getJSONObject(rightIndex).put(KEY_OF_TYPE, VALUE_TYPE_HANDLED)
-
-        return horizontalConstraints
+        return horizontalQatnases
     }
 
     /**
-     * @param   above       objects' json representation array, that are above of current belgi's line
-     * @param   below       objects' json representation array, that are below of current belgi's line
-     * @param   objectIndex current belgi's index inside pair <belgi, constraints>
-     * @return              list of vertical constraints' json representation
+     * @param   jsonBelgi   current json belgi to constraint, need for passing id to find relative position in current json array
+     * @param   jsonArrays  all json arrays
+     * @param   arrayIndex  current json array's index
+     * @return              list of vertical constraints'
      * */
-    private fun getVerticalConstraints(above: JSONArray, below: JSONArray, objectIndex: Int): List<QatnasById> {
-        val verticalConstraints = mutableListOf<QatnasById>()
+    private fun getVerticalQatnases(jsonBelgi: JSONObject, jsonArrays: List<JSONArray>, arrayIndex: Int): List<QatnasById> {
+        val position = getJsonBelgiRelativePosition(jsonArrays[arrayIndex], jsonBelgi.getInt(KEY_BELGI_ID))
+        val verticalQatnases = mutableListOf<QatnasById>()
 
-        mutableListOf<Pair<Int, JSONObject>>().let { constraintsAbove ->
-            above.forEachObject { index, jsonObject ->
+        mutableListOf<Pair<Int, JSONObject>>().let { qatnasesAbove ->
+            if (arrayIndex == 0) throw RuntimeException("There must be constraint on top of belgi")
+            val topJsonArray = jsonArrays[arrayIndex - 1]
+            topJsonArray.forEachObject { index, jsonObject ->
                 if (jsonObject.getInt(KEY_OF_TYPE) == VALUE_TYPE_QATNAS)
-                    constraintsAbove += index to jsonObject
+                    qatnasesAbove += index to jsonObject
             }
-            getConstraint(constraintsAbove[objectIndex].second, "above", VALUE_TOP_EDGE, false)
-                    .let { if (it != null) verticalConstraints += it }
-            above.getJSONObject(constraintsAbove[objectIndex].first).put(KEY_OF_TYPE, VALUE_TYPE_HANDLED)
+            getQatnas(qatnasesAbove[position].second, "above", VALUE_TOP_EDGE, false)
+                    .let { if (it != null) verticalQatnases += it }
         }
 
-        mutableListOf<Pair<Int, JSONObject>>().let { constraintsBelow ->
-            below.forEachObject { index, jsonObject ->
+        mutableListOf<Pair<Int, JSONObject>>().let { qatnasesBelow ->
+            // TODO handle if there's no constraint in the bottom
+            if (arrayIndex == jsonArrays.size) throw RuntimeException("There must be constraint on bottom of belgi")
+            val bottomJsonArray = jsonArrays[arrayIndex + 1]
+            bottomJsonArray.forEachObject { index, jsonObject ->
                 if (jsonObject.getInt(KEY_OF_TYPE) == VALUE_TYPE_QATNAS)
-                    constraintsBelow += index to jsonObject
+                    qatnasesBelow += index to jsonObject
             }
-            getConstraint(constraintsBelow[objectIndex].second, "below", VALUE_BOTTOM_EDGE, false)
-                    .let { if (it != null) verticalConstraints += it }
-            below.getJSONObject(constraintsBelow[objectIndex].first).put(KEY_OF_TYPE, VALUE_TYPE_HANDLED)
+            getQatnas(qatnasesBelow[position].second, "below", VALUE_BOTTOM_EDGE, false)
+                    .let { if (it != null) verticalQatnases += it }
         }
 
-        return verticalConstraints
+        return verticalQatnases
     }
 
     /**
-     * @param   jsonConstraint  json object of constraint
+     * This function need for defining vertical constraints. If there're several belgi objects,
+     * by defining current belgi's json object's position in json array,
+     * you can define position of vertical constraint in line above and below
+     *
+     * @param   jsonArray   current json array
+     * @param   id          current belgi's id
+     * @return              position of belgi between all of belgi in json array
+     * @see                 getVerticalQatnases
+     * */
+    private fun getJsonBelgiRelativePosition(jsonArray: JSONArray, id: Int): Int {
+        for (i in 0 until jsonArray.length()) {
+            var belgiIndex = 0
+            val jsonObject = jsonArray.getJSONObject(i)
+            if (jsonObject.isBelgi) {
+                if (jsonObject.getInt(KEY_BELGI_ID) == id)
+                    return belgiIndex
+
+                @Suppress("UNUSED_CHANGED_VALUE")
+                belgiIndex++
+            }
+        }
+        return 0
+    }
+
+
+    /**
+     * @param   jsonQatnas      json object of constraint
      * @param   sideLabel       label of side, it's need for exception
      * @param   fromEdge        edge, where starts constraint
      * @param   isHorizontal    if constraint is horizontal marker
      * @return                  constraint by id, or null, if it's empty constraint
      * @see                     empty
      * */
-    private fun getConstraint(jsonConstraint: JSONObject, sideLabel: String, fromEdge: Int, isHorizontal: Boolean = true): QatnasById? {
-        if (jsonConstraint.getInt(KEY_OF_TYPE) != VALUE_TYPE_QATNAS) RuntimeException("There must be constraint on the $sideLabel side of belgi")
-        if (jsonConstraint.getInt(KEY_CONSTRAINT_TARGET_ID) == VALUE_EMPTY_CONSTRAINT) return null
+    private fun getQatnas(jsonQatnas: JSONObject, sideLabel: String, fromEdge: Int, isHorizontal: Boolean = true): QatnasById? {
+        if (jsonQatnas.getInt(KEY_OF_TYPE) != VALUE_TYPE_QATNAS) throw RuntimeException("There must be constraint on the $sideLabel side of belgi")
+        if (isHorizontal) jsonQatnas.put(KEY_OF_TYPE, VALUE_TYPE_HANDLED_CONSTRAINT)
+        if (jsonQatnas.getInt(KEY_QATNAS_TARGET_ID) == VALUE_EMPTY_QATNAS) return null
         return QatnasById (
                 fromEdge,
-                jsonConstraint.getInt(KEY_CONSTRAINT_TARGET_ID),
-                getEdge(isHorizontal, jsonConstraint.getBoolean(KEY_CONSTRAINT_TARGET_POLE)),
-                jsonConstraint.getInt(KEY_MARGIN)
+                jsonQatnas.getInt(KEY_QATNAS_TARGET_ID),
+                getEdge(isHorizontal, jsonQatnas.getBoolean(KEY_QATNAS_TARGET_POLE)),
+                jsonQatnas.getInt(KEY_MARGIN)
         )
     }
 
